@@ -1,0 +1,22 @@
+Package: RESRECT
+Title: Recorrecting Effect-size and Significance with Rank-based Evaluation of Confounds in Tests
+Version: 0.1.0
+Author: Ethan Fenton
+Maintainer: Ethan Fenton <ethanfenton27@gmail.com>
+Authors@R: 
+    person("Ethan", "Fenton", , "ethanfenton27@gmail.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0009-0008-1945-7517"))
+Description: Correct for batch variation in single cell transcriptomics differential expression testing by scaling the expression level ranks of each gene within each sample and cell type to their respective median. 
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Imports:
+    dplyr,
+    tidyr,
+    tidyverse,
+    ggplot2,
+    Seurat,
+    utils,
+    stats

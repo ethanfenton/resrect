@@ -1,0 +1,1 @@
+utils::globalVariables(c("pct.exp", "lookup_grouping", "gene", "barcode", "group", "median_adj_rank", "mean_adj_rank", "features.plot", "median_value", "mean_value", "orig.ident", "treatment", "group_levels", "cell_count"))
