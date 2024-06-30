@@ -12,7 +12,7 @@ devtools::install_github("ethanfenton/resrect")
 ```
 
 ```{r}
-library(ResRect)
+library(resrect)
 
 # Calculate ranks
 ## 'so' is a Seurat Object
