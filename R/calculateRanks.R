@@ -21,7 +21,7 @@ calculateRanks <- function(so, assay = "SCT", layer = "data", grouping1 = "sampl
   requireNamespace("utils")
 
   DefaultAssay(so) <- assay
-  data <- so[[layer]]
+  data <- so@assays[[assay]][layer]
   groupings <- data.frame(sample = so[[grouping1]], ct1 = so[[grouping2]])
   groupings <- groupings %>%
     dplyr::mutate(lookup_grouping = paste(sample, ct1, sep = "_"))
