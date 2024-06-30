@@ -1,4 +1,4 @@
-Recorrecting Effect-size and Significance with Rank-based Evaluation of Confounds in Tests
+# Recorrecting Effect-size and Significance with Rank-based Evaluation of Confounds in Tests
 
 ## Installation instructions
 ```r
