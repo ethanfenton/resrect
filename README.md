@@ -10,3 +10,20 @@ if (!requireNamespace("devtools", quietly = TRUE)) {
 # Install ResRect from GitHub
 devtools::install_github("ethanfenton/resrect")
 ```
+
+```{r}
+library(ResRect)
+
+# Calculate ranks
+## 'so' is a Seurat Object
+so <- calculateRanks(so)
+
+# Plot unadjusted ranks
+plotRanks(so, output_folder = "path/to/outputs/")
+
+# Adjust ranks
+so <- adjustRanks(so)
+
+# Plot adjusted ranks
+plotAdjustedRanks(so, output_folder = "path/to/outputs/")
+```
