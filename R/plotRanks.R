@@ -1,46 +1,73 @@
-#' Plot ranks
+#' Plot Ranks
 #'
-#' @param so Seurat object
-#' @param output_folder Output folder path
-#' @param group_levels Group levels
+#' @param melted_data Dataframe containing the melted data for plotting.
+#' @param output_folder Output folder path for saving plots.
+#' @param group_levels Levels for grouping samples.
+#'
+#' @import ggplot2
+#' @import dplyr
+#' @import tidyr
+#' @importFrom rlang sym
 #' @export
-plotRanks <- function(so, output_folder, group_levels) {
-  df_ranked <- as.data.frame(so@assays[["ranks"]]@counts)
-  df_ranked$barcode <- rownames(df_ranked)
-  metadata <- so@meta.data %>% dplyr::select(c("treatment", "sex", "genotype", "orig.ident", "ct1"))
-  metadata$barcode <- rownames(metadata)
-  df_ranked <- dplyr::left_join(df_ranked, metadata, by="barcode")
-  rownames(df_ranked) <- df_ranked$barcode
-  df_ranked <- df_ranked[, -grep('^"', colnames(df_ranked))]
+plotRanks <- function(melted_data, output_folder, group_levels=NA, adjusted=FALSE) {
+  require(ggplot2)
+  require(dplyr)
+  require(tidyr)
+  require(rlang)
+  require(ggforce)
 
-  melted_data <- tidyr::pivot_longer(df_ranked, cols = -c(barcode, ct1, orig.ident, genotype, sex, treatment), names_to = "gene", values_to = "rank")
-  melted_data <- melted_data[!is.na(melted_data$rank), ]
-  melted_data$group <- paste(melted_data$treatment, melted_data$genotype, melted_data$sex, melted_data$orig.ident, sep="-")
-
+  if(adjusted){
+    melted_data$rank <- melted_data$adj_rank
+  }
+  # Calculate stats of each group
   summary_stats <- melted_data %>%
-    dplyr::group_by(group, !!rlang::sym("ct1")) %>%
-    dplyr::summarise(median_value = stats::median(rank, na.rm=TRUE),
-                     mean_value = mean(rank, na.rm=TRUE))
+    dplyr::group_by(group, !!sym("ct1")) %>%
+    dplyr::summarise(
+      median_value = median(rank, na.rm = TRUE),
+      mean_value = mean(rank, na.rm = TRUE)
+    )
 
+  # Calculate number of cells in each group
   cell_counts <- melted_data %>%
-    dplyr::filter(gene == "Actb") %>%
-    dplyr::group_by(group, !!rlang::sym("ct1")) %>%
-    dplyr::summarise(cell_count = dplyr::n())
+    group_by(group, !!sym("ct1")) %>%
+    summarise(cell_count = n_distinct(barcode))
 
-  summary_stats <- dplyr::left_join(summary_stats, cell_counts, by=c("group", "ct1"))
+  summary_stats <- dplyr::left_join(summary_stats, cell_counts, by = c("group", "ct1"))
   melted_data <- dplyr::left_join(melted_data, summary_stats, by = c("group", "ct1"))
-  melted_data$group <- factor(melted_data$group, levels = group_levels)
 
-  p <- ggplot2::ggplot(melted_data, ggplot2::aes(x=group, y=rank)) +
-    ggplot2::geom_boxplot(ggplot2::aes(fill=orig.ident, color=treatment)) +
-    ggplot2::facet_wrap(~ct1) +
-    ggplot2::geom_text(data = summary_stats, ggplot2::aes(label = paste("Median:\n", round(median_value, 2)), y = median_value + 10), vjust = -1, color = "black") +
-    ggplot2::geom_text(data = summary_stats, ggplot2::aes(label = paste("Mean:\n", round(mean_value, 2)), y = median_value), vjust = 1, color = "black") +
-    ggplot2::geom_text(data = summary_stats, ggplot2::aes(label = paste("Count:\n", cell_count), y = median_value - 15), vjust = 2, color = "black") +
-    ggplot2::labs(x = "Sample", y = "Rank") +
-    ggplot2::scale_color_manual(values=c("black", "blue")) +
-    ggplot2::theme(axis.text.x = ggplot2::element_text(angle=70, hjust=1), strip.text = ggplot2::element_text(size=30)) +
-    ggplot2::ggtitle("Rank Distribution by Pool")
+  if (!is.na(group_levels)) {
+    melted_data$group <- factor(melted_data$group, levels = group_levels)
+  }
 
-  ggplot2::ggsave(filename = paste0(output_folder, "unadjusted_ranks_by_ct.pdf"), plot = p, height = 40, width = 40, units = "in", dpi = 600)
+  # Plotting with ggforce to paginate facets
+  num_ct1 <- length(unique(melted_data$ct1))
+  for (i in 1:num_ct1) {
+    p <- ggplot(melted_data, aes(x = group, y = rank)) +
+      geom_boxplot(aes(fill = orig.ident, color = treatment)) +
+      ggforce::facet_wrap_paginate(~ct1, ncol = 1, nrow = 1, page = i, scales = "free_y") +
+      geom_label(data = summary_stats, aes(label = paste("Median:\n", round(median_value, 2)), y = median_value + 10), vjust = -1, color = "black", size = 3, fill = "white", label.padding = unit(0.5, "lines"), label.r = unit(0.2, "lines")) +
+      geom_label(data = summary_stats, aes(label = paste("Count:\n", cell_count), y = median_value - 15), vjust = 2, color = "black", size = 3, fill = "white", label.padding = unit(0.5, "lines"), label.r = unit(0.2, "lines")) +
+      labs(x = "Sample", y = "Rank") +
+      scale_color_manual(values = c("black", "blue")) +
+      theme(
+        axis.text.x = element_text(angle = 70, hjust = 1),
+        strip.text = element_text(size = 10),  # Adjusted text size for better fitting
+        legend.position = "bottom"  # Move legend to the bottom for better space usage
+      )
+
+    # Extract the facet label for the current page
+    facet_label <- levels(factor(melted_data$ct1))[i]
+
+    # Set the plot title
+    if(adjusted){
+      p <- p + ggtitle(paste("Adj Rank Distribution by Pool -", facet_label))
+      # Save each page as a separate PNG
+      ggsave(filename = paste0(output_folder, "/adjusted_ranks_by_ct_", facet_label, ".png"), plot = p, height = 10, width = 10, units = "in", dpi = 300)
+    }else{
+      p <- p + ggtitle(paste("Orig Rank Distribution by Pool -", facet_label))
+      # Save each page as a separate PNG
+      ggsave(filename = paste0(output_folder, "/unadjusted_ranks_by_ct_", facet_label, ".png"), plot = p, height = 10, width = 10, units = "in", dpi = 300)
+    }
+  }
+
 }

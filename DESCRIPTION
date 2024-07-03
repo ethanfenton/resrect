@@ -1,6 +1,6 @@
 Package: resrect
 Title: Recorrecting Effect-size and Significance with Rank-based Evaluation of Confounds in Tests
-Version: 0.1.0
+Version: 0.1.1
 Author: Ethan Fenton
 Maintainer: Ethan Fenton <ethanfenton27@gmail.com>
 Authors@R: 
@@ -19,4 +19,8 @@ Imports:
     ggplot2,
     Seurat,
     utils,
-    stats
+    stats,
+    Rcpp,
+    ggforce
+LinkingTo:
+    Rcpp
