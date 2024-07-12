@@ -10,18 +10,26 @@
 #'
 #' @import dplyr
 #' @export
-adjustRanks <- function(melted_data, grouping1 = "sample", grouping2 = "ct1") {
+adjustRanks <- function(melted_data, grouping1 = "sample", grouping2 = "ct1", avg_fxn="median") {
   require(dplyr)
-  # Calculate the median rank for each cell type (ct1) and sample
-  median_ranks <- melted_data %>%
+  # Convert the function name to a function object
+  avg_function <- match.fun(avg_fxn)
+  # Calculate the average rank for each cell type (ct1) and sample
+  avg_ranks <- melted_data %>%
     dplyr::group_by(!!sym(grouping2), !!sym(grouping1)) %>%
-    dplyr::summarise(median_rank = median(rank, na.rm = TRUE)) %>%
+    dplyr::summarise(avg_rank = avg_function(rank, na.rm = TRUE)) %>%
     ungroup()
 
   # Join the median ranks with the original data
   melted_data <- melted_data %>%
-    dplyr::left_join(median_ranks, by = c(grouping2, grouping1)) %>%
-    dplyr::mutate(adj_rank = rank - median_rank)
+    dplyr::left_join(avg_ranks, by = c(grouping2, grouping1)) %>%
+    dplyr::mutate(adj_rank = rank - avg_rank)
+
+  # within each cell type, ensure all ranks are >= 0 by substracting the (presumably negative) lowest rank from each
+  melted_data <- melted_data %>%
+    dplyr::group_by(!!sym(grouping2)) %>%
+    dplyr::mutate(min_ct_rank = min(adj_rank))
+  melted_data$adj_rank <- melted_data$adj_rank - melted_data$min_ct_rank
 
   return(melted_data)
 }

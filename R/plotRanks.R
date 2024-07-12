@@ -9,7 +9,7 @@
 #' @import tidyr
 #' @importFrom rlang sym
 #' @export
-plotRanks <- function(melted_data, output_folder, group_levels=NA, adjusted=FALSE) {
+plotRanks <- function(melted_data, output_folder, group_levels=NA, adjusted=FALSE, box_or_vln="box", pct_exp_cutoff) {
   require(ggplot2)
   require(dplyr)
   require(tidyr)
@@ -42,31 +42,49 @@ plotRanks <- function(melted_data, output_folder, group_levels=NA, adjusted=FALS
   # Plotting with ggforce to paginate facets
   num_ct1 <- length(unique(melted_data$ct1))
   for (i in 1:num_ct1) {
-    p <- ggplot(melted_data, aes(x = group, y = rank)) +
-      geom_boxplot(aes(fill = orig.ident, color = treatment)) +
-      ggforce::facet_wrap_paginate(~ct1, ncol = 1, nrow = 1, page = i, scales = "free_y") +
-      geom_label(data = summary_stats, aes(label = paste("Median:\n", round(median_value, 2)), y = median_value + 10), vjust = -1, color = "black", size = 3, fill = "white", label.padding = unit(0.5, "lines"), label.r = unit(0.2, "lines")) +
-      geom_label(data = summary_stats, aes(label = paste("Count:\n", cell_count), y = median_value - 15), vjust = 2, color = "black", size = 3, fill = "white", label.padding = unit(0.5, "lines"), label.r = unit(0.2, "lines")) +
-      labs(x = "Sample", y = "Rank") +
-      scale_color_manual(values = c("black", "blue")) +
-      theme(
-        axis.text.x = element_text(angle = 70, hjust = 1),
-        strip.text = element_text(size = 10),  # Adjusted text size for better fitting
-        legend.position = "bottom"  # Move legend to the bottom for better space usage
-      )
+    if(box_or_vln=="box"){
+      p <- ggplot(melted_data, aes(x = group, y = rank)) +
+        geom_boxplot(aes(fill = orig.ident, color = treatment)) +
+        ggforce::facet_wrap_paginate(~ct1, ncol = 1, nrow = 1, page = i, scales = "free_y") +
+        geom_label(data = summary_stats, aes(label = paste("Mean:\n", round(mean_value, 2)), y = median_value + median_value/8), vjust = -1, color = "black", size = 3, fill = "white", label.padding = unit(0.15, "lines"), label.r = unit(0.1, "lines")) +
+        geom_label(data = summary_stats, aes(label = paste("Median:\n", round(median_value, 2)), y = median_value + 10), vjust = -1, color = "black", size = 3, fill = "white", label.padding = unit(0.15, "lines"), label.r = unit(0.1, "lines")) +
+        geom_label(data = summary_stats, aes(label = paste("Count:\n", cell_count), y = median_value - 15), vjust = 2, color = "black", size = 3, fill = "white", label.padding = unit(0.15, "lines"), label.r = unit(0.1, "lines")) +
+        labs(x = "Sample", y = "Rank") +
+        scale_color_manual(values = c("black", "blue","red")) +
+        theme(
+          axis.text.x = element_text(angle = 70, hjust = 1),
+          strip.text = element_text(size = 10),  # Adjusted text size for better fitting
+          legend.position = "bottom"  # Move legend to the bottom for better space usage
+        )
+    }else if(box_or_vln=="vln"){
+      p <- ggplot(melted_data, aes(x = group, y = rank)) +
+        geom_violin(aes(fill = orig.ident, color = treatment)) +
+        ggforce::facet_wrap_paginate(~ct1, ncol = 1, nrow = 1, page = i, scales = "free_y") +
+        geom_label(data = summary_stats, aes(label = paste("Mean:\n", round(mean_value, 2)), y = median_value + 30), vjust = -1, color = "black", size = 3, fill = "white", label.padding = unit(0.1, "lines"), label.r = unit(0.1, "lines")) +
+        geom_label(data = summary_stats, aes(label = paste("Median:\n", round(median_value, 2)), y = median_value + 10), vjust = -1, color = "black", size = 3, fill = "white", label.padding = unit(0.1, "lines"), label.r = unit(0.1, "lines")) +
+        geom_label(data = summary_stats, aes(label = paste("Count:\n", cell_count), y = median_value - 15), vjust = 2, color = "black", size = 3, fill = "white", label.padding = unit(0.1, "lines"), label.r = unit(0.1, "lines")) +
+        labs(x = "Sample", y = "Rank") +
+        scale_color_manual(values = c("black", "blue","red")) +
+        theme(
+          axis.text.x = element_text(angle = 70, hjust = 1),
+          strip.text = element_text(size = 10),  # Adjusted text size for better fitting
+          legend.position = "bottom"  # Move legend to the bottom for better space usage
+        )
+    }
+
 
     # Extract the facet label for the current page
     facet_label <- levels(factor(melted_data$ct1))[i]
 
     # Set the plot title
     if(adjusted){
-      p <- p + ggtitle(paste("Adj Rank Distribution by Pool -", facet_label))
+      p <- p + ggtitle(paste("Adj Rank Distribution by Pool -", facet_label), subtitle = paste("Cutoff", pct_exp_cutoff))
       # Save each page as a separate PNG
-      ggsave(filename = paste0(output_folder, "/adjusted_ranks_by_ct_", facet_label, ".png"), plot = p, height = 10, width = 10, units = "in", dpi = 300)
+      ggsave(filename = paste0(output_folder, "/adjusted_ranks_by_ct_", facet_label,"_cutoff_", pct_exp_cutoff, ".png"), plot = p, height = 10, width = 10, units = "in", dpi = 300)
     }else{
-      p <- p + ggtitle(paste("Orig Rank Distribution by Pool -", facet_label))
+      p <- p + ggtitle(paste("Orig Rank Distribution by Pool -", facet_label), subtitle = paste("Cutoff", pct_exp_cutoff))
       # Save each page as a separate PNG
-      ggsave(filename = paste0(output_folder, "/unadjusted_ranks_by_ct_", facet_label, ".png"), plot = p, height = 10, width = 10, units = "in", dpi = 300)
+      ggsave(filename = paste0(output_folder, "/unadjusted_ranks_by_ct_", facet_label,"_cutoff_", pct_exp_cutoff, ".png"), plot = p, height = 10, width = 10, units = "in", dpi = 300)
     }
   }
 

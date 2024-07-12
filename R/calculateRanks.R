@@ -21,7 +21,7 @@
 #' @importFrom utils txtProgressBar
 #' @importFrom Seurat CreateAssayObject DotPlot
 #' @export
-calculateRanks <- function(so, assay = "SCT", layer = "data", grouping1 = "sample", grouping2 = "ct1", pct_exp_cutoff = 10, output_folder, group_levels = NA) {
+calculateRanks <- function(so, assay = "SCT", layer = "data", grouping1 = "sample", grouping2 = "ct1", pct_exp_cutoff = 10, avg_fxn="median", box_or_vln="vln", output_folder, group_levels = NA, save_melted=FALSE) {
   require(dplyr)
   require(tidyverse)
   require(ggplot2)
@@ -84,13 +84,16 @@ calculateRanks <- function(so, assay = "SCT", layer = "data", grouping1 = "sampl
   df_ranked <- as.data.table(data)
   rm(data)
   gc()
-  df_ranked[, (features) := lapply(.SD, function(x) rank(-x, ties.method = "average", na.last = "keep")), by = grouping2, .SDcols = features]
+  df_ranked[, (features) := lapply(.SD, function(x) rank(x, ties.method = "average", na.last = "keep")), by = grouping2, .SDcols = features]
   setDF(df_ranked)
   rownames(df_ranked) <- df_ranked$barcode
 
   # Create an assay object with ranked data
-  #so[["ranks"]] <- CreateAssayObject(counts = t(df_ranked %>% dplyr::select(-colnames(metadata))))
-  so[["ranks"]]$counts <- t(df_ranked %>% dplyr::select(-colnames(metadata)))
+  new_assay <- t(df_ranked %>% dplyr::select(-colnames(metadata)))
+  new_assay[is.na(new_assay)] <- 0 # trying this july 11
+  new_assay <- CreateAssayObject(counts = new_assay)
+  so[["ranks"]]  <- new_assay
+  #so[["ranks"]]$counts <- t(df_ranked %>% dplyr::select(-colnames(metadata)))
 
   # Reshape data for plotting
   print("reshaping data for plotting")
@@ -109,29 +112,29 @@ calculateRanks <- function(so, assay = "SCT", layer = "data", grouping1 = "sampl
   # but maybe at least the adjustment will still be scaled to the capture the trend of the rank difference
 
   # Call plotRanks function for original ranks
-  orig_ranks_folder <- file.path(output_folder, "orig_ranks")
+  orig_ranks_folder <- file.path(output_folder, "orig_ranks", avg_fxn)
   if (!dir.exists(orig_ranks_folder)) {
     dir.create(orig_ranks_folder, recursive = TRUE)
   }
   gc()
-  print("Plotting Original Ranks")
-  # ETHAN UNCOMMENT THE FOLLOWING LINE for final use and delete this comment !!!
-  #plotRanks(melted_data, orig_ranks_folder, group_levels)
+  #plotRanks(melted_data, orig_ranks_folder, group_levels, box_or_vln=box_or_vln, pct_exp_cutoff=pct_exp_cutoff)
 
   # Adjust ranks
   print("Adjusting Ranks")
-  melted_data <- adjustRanks(melted_data, grouping1 = grouping1, grouping2 = grouping2)
+  melted_data <- adjustRanks(melted_data, grouping1 = grouping1, grouping2 = grouping2, avg_fxn=avg_fxn)
 
+  if(save_melted){
+    saveRDS(melted_data, file=paste0(output_folder, "/pct_exp_",pct_exp_cutoff,"_melted_data.rds"))
+  }
   # Create subfolders for original and adjusted ranks plots
-  adj_ranks_folder <- file.path(output_folder, "adj_ranks")
+  adj_ranks_folder <- file.path(output_folder, "adj_ranks", avg_fxn)
   if (!dir.exists(adj_ranks_folder)) {
     dir.create(adj_ranks_folder, recursive = TRUE)
   }
 
   # Plotting adjusted ranks
   print("Plotting Adjusted Ranks")
-  # ETHAN UNCOMMENT THE FOLLOWING LINE for final use and delete this comment !!!
-  #plotRanks(melted_data, adj_ranks_folder, adjusted=TRUE)
+  #plotRanks(melted_data, adj_ranks_folder, box_or_vln = box_or_vln, adjusted=TRUE, pct_exp_cutoff=pct_exp_cutoff)
   gc()
 
   # Add adjusted ranks to the Seurat object
@@ -139,7 +142,7 @@ calculateRanks <- function(so, assay = "SCT", layer = "data", grouping1 = "sampl
     maditr::dcast(barcode ~ gene, value.var = "adj_rank") %>%
     column_to_rownames("barcode")
   gc()
-  #so[["adj_ranks"]] <- CreateAssayObject(counts = t(as.matrix(melted_data)))
-  so[["adj_ranks"]]$counts <- t(as.matrix(melted_data))
+  so[["adj_ranks"]] <- CreateAssayObject(counts = t(as.matrix(melted_data)))
+  #so[["adj_ranks"]]$counts <- t(as.matrix(melted_data))
   return(so)
 }
